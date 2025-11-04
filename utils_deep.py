@@ -7,6 +7,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import MeanSquaredError
 from typing import Tuple
 import time
+import tensorflow as tf
 
 
 
@@ -101,27 +102,35 @@ def update_Q_DQN(batch : list, model, alpha: float, gamma: float) -> None:
         alpha (float): Learning rate
         gamma (float): Discount factor for future rewards
     """
-    states = np.array([experience[0] for experience in batch])
-    actions = np.array([experience[1] for experience in batch])
-    rewards = np.array([experience[2] for experience in batch])
-    next_states = np.array([experience[3] for experience in batch])
-    dones = np.array([experience[4] for experience in batch])
 
-    with tf.GradientTape() as tape:
-        q_values = model(states)
-        q_values_next = model(next_states)
+    """
+    Note perso 
 
-        target_q_values = q_values.numpy()
-        for i in range(len(batch)):
-            if dones[i]:
-                target_q_values[i][actions[i]] = rewards[i]
-            else:
-                target_q_values[i][actions[i]] = rewards[i] + gamma * np.max(q_values_next[i].numpy())
 
-        loss = tf.reduce_mean(tf.square(target_q_values - q_values))
+    y_j = { r_j /\ r_j + y max_a' Q(state_j, a_j, theta (????))} [1] -> Terminal j+1 ; [2] -> Non-terminal j+2
 
-    gradients = tape.gradient(loss, model.trainable_variables)
-    model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    gradient descent (y_j - Q(state_j, a_j, theta))^2
+
+
+    """
+
+    state, action, reward, vec_next_state, done = [batch]
+
+    with tf.GradientTape as tape : 
+        if(done) :
+            loss = reward
+        else : 
+            value = model.predict(np.array([vec_next_state]))[0]
+            qmax = np.argmax(value)
+            loss = reward + gamma * qmax
+        
+        
+        
+    
+
+
+    
+
     
 
 
@@ -154,14 +163,18 @@ def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episo
         done = False
 
         while not done:
-            vec_state = space_to_vec(space)
+            old_space = space.copy()
             action = choose_action(vec_state, epsilon, model)
 
             new_pos, reward, done = apply_action(action, pos,  space, rewards)
             space[pos[0], pos[1]] = EMPTY
             space[new_pos[0], new_pos[1]] = PLAYER
 
+            vec_state = space_to_vec(old_space)
+
             vec_next_state = space_to_vec(space)
+
+
 
             batch = [(vec_state, action, reward, vec_next_state, done)]
             update_Q_DQN(batch, model, alpha, gamma)

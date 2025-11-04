@@ -1,4 +1,7 @@
 import pygame
+from view.utils import load_gif_frames
+from core.qlearning import test_qlearning
+from view.animatedSprite import AnimatedSprite
 
 TILE_SIZE = 64
 
@@ -22,6 +25,18 @@ class Engine:
             "center": pygame.image.load("sprites/terrains/sol.png"),
         }
 
+        self.player = AnimatedSprite("sprites/perso/robotGame64.gif", (0, 0))
+
+        self.enemies = [
+            AnimatedSprite("sprites/perso/slime_bleu.gif",   (0, 1)),
+            AnimatedSprite("sprites/perso/slime_rouge.gif",  (2, 1)),
+            AnimatedSprite("sprites/perso/slime_violet.gif", (1, 3)),
+            AnimatedSprite("sprites/perso/slime_violet.gif", (3, 2)),
+        ]
+
+    def startQLearnin(self):
+        test_qlearning()
+    
     def draw_map(self):
         for y in range(self.height):
             for x in range(self.width):
@@ -57,16 +72,30 @@ class Engine:
     def run(self):
         running = True
         clock = pygame.time.Clock()
-
+    
         while running:
+            dt = clock.tick(60)  # temps depuis derniere frame
+           
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
 
+            # dessine le terrain
             self.draw_map()
+
+            # dessine le player
+            self.player.update(dt)
+            self.player.draw(self.screen)
+
+            # dessine les enemis
+            for enemy in self.enemies:
+                enemy.update(dt)
+                enemy.draw(self.screen)
+
             pygame.display.flip()
             clock.tick(60)
 
         pygame.quit()
+
 
 

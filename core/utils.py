@@ -349,7 +349,7 @@ def test_policy(Q: np.ndarray, rewards: tuple[int, int, int, int]) -> tuple[list
 
         print(f"\nStep {steps}: Action {['Up', 'Right', 'Down', 'Left'][action]}")
         print(f"Position: {pos}")
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
         if done:
             if reward > 0:

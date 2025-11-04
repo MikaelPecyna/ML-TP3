@@ -1,8 +1,7 @@
 #!/bin/python3
 
-
 import numpy as np
-from utils import *
+from core.utils import *
 #from utils_deep import *
 from tqdm import tqdm
 import matplotlib.pyplot as plt

@@ -1,4 +1,5 @@
 from view.engine import Engine
+from core.qlearning import test_qlearning
 
 if __name__ == "__main__":
     test_qlearning()

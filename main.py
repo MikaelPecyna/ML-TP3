@@ -3,7 +3,7 @@
 
 import numpy as np
 from utils import *
-from utils_deep import *
+# from utils_deep import *
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
@@ -54,8 +54,8 @@ def test_qdeeplearning():
 #       MAIN
 # ======================
 if __name__ == "__main__":
-    # test_qlearning()
-    test_qdeeplearning()
+    test_qlearning()
+    # test_qdeeplearning()
 
     pass
     

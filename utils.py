@@ -1,6 +1,7 @@
 import numpy as np
 import random
 from tqdm import tqdm
+import copy
 
 # Constants representing different game elements
 EMPTY   = 0  # Empty cell on the space
@@ -8,8 +9,11 @@ PLAYER  = 1  # Player position
 GOAL    = 2  # Goal cell
 DRAGON  = 3  # Dragon position
 
+HEIGHT = 4
+WIDTH  = 4
 
-def initialize_space(height: int = 4, width: int = 4) -> np.ndarray:
+
+def initialize_space(height: int = HEIGHT, width: int = WIDTH) -> np.ndarray:
     """
     Initialize and return the game space with the initial configuration.
 
@@ -20,14 +24,14 @@ def initialize_space(height: int = 4, width: int = 4) -> np.ndarray:
     - DRAGON (3)  : Cell occupied by a dragon to avoid
 
     Args:
-        height (int): Number of rows in the space (default: 4)
-        width (int): Number of columns in the space (default: 4)
+        height (int): Number of rows in the space (default: HEIGHT)
+        width (int): Number of columns in the space (default: WIDTH)
 
     Returns:
         np.ndarray: 2D NumPy array with the initial game configuration:
                     - Player at position (0,0)
-                    - Dragons at positions (1,0), (1,2), (2,3), (3,1)
-                    - Goal at position (3,3)
+                    - Dragons at relative positions based on height and width
+                    - Goal at position (height-1, width-1)
                     Note: Access via space[y][x]
     """
     # Create an empty space
@@ -36,15 +40,44 @@ def initialize_space(height: int = 4, width: int = 4) -> np.ndarray:
     # Place initial elements
     space[0][0] = PLAYER    # Player starting position
     space[1][0] = DRAGON    # First dragon
-    space[1][2] = DRAGON    # Second dragon
-    space[2][3] = DRAGON    # Third dragon
-    space[3][1] = DRAGON    # Fourth dragon
-    space[3][3] = GOAL      # Goal position
+    space[1][width-2] = DRAGON    # Second dragon
+    space[height-2][width-1] = DRAGON    # Third dragon
+    space[height-1][1] = DRAGON    # Fourth dragon
+    space[height-1][width-1] = GOAL      # Goal position
+
+    return space
+
+def update_space(space : np.ndarray, start_space, prob : float = 0.3) -> np.ndarray:
+    """
+    Update space with a probabilty of change of the dragon
+
+    Args:
+        space (np.ndarray): Current state of the game space
+        start_space (np.ndarray): Initial state of the game space
+        prob (float): Probability of changing the dragon position (default: 0.3)
+
+    Returns:
+        np.ndarray: Updated game space
+
+
+    Algo : 
+        start space is used to know where the dragons are initially because we dont know where they are in the current space if they have been removed
+    """
+    height, width = space.shape
+
+    for y in range(height):
+        for x in range(width):
+            if start_space[y][x] == DRAGON:
+                if random.random() <= prob:
+                    space[y][x] = DRAGON if space[y][x] == EMPTY else EMPTY
+                        
+
 
     return space
 
 
-def initialize_space_random(height: int = 4, width: int = 4, num_dragons: int = 4) -> np.ndarray:
+
+def initialize_space_random(height: int = HEIGHT, width: int = WIDTH, num_dragons: int = 4) -> np.ndarray:
     """
     Initialize and return a random game space configuration.
 
@@ -87,6 +120,8 @@ def initialize_space_random(height: int = 4, width: int = 4, num_dragons: int = 
         space[pos[0]][pos[1]] = DRAGON
 
     return space
+
+
 
 
 
@@ -206,13 +241,13 @@ def choose_action(position: tuple[int, int], epsilon: float, Q: np.ndarray) -> i
         return int(random.choice(best_actions))
         
 
-def state_to_index(position: tuple[int, int], space_width: int = 4) -> int:
+def state_to_index(position: tuple[int, int], space_width: int = WIDTH) -> int:
     """
     Convert a position (y,x) to a unique index for the Q-table.
 
     Args:
         position (tuple[int, int]): Current position (y, x) on the space
-        space_width (int): Width of the space (default: 4)
+        space_width (int): Width of the space (default: WIDTH)
 
     Returns:
         int: Unique index of the state in the Q-table
@@ -220,7 +255,7 @@ def state_to_index(position: tuple[int, int], space_width: int = 4) -> int:
     Notes:
         - Uses row-major encoding:
           idx = y * space_width + x
-        - For a 4x4 space, indices range from 0 to 15
+        - For a HEIGHTxWIDTH space, indices range from 0 to HEIGHT*WIDTH-1
     """
     y, x = position
     return y * space_width + x
@@ -291,6 +326,8 @@ def train_Q_learning(alpha: float, gamma: float, epsilon_start: float, episode: 
 
     space =initialize_space()
 
+    start_space = copy.deepcopy(space)
+
     Q = initialize_Q_table(space)
 
     epsilon = epsilon_start
@@ -309,10 +346,36 @@ def train_Q_learning(alpha: float, gamma: float, epsilon_start: float, episode: 
             next_state = state_to_index(new_pos)
             update_Q_table(Q, state, next_state, action, alpha, reward, gamma, done)
             pos = new_pos
+        
+            space = update_space(space, start_space)
 
         epsilon = max(epsilon_min, epsilon * epsilon_decay)  # Reduce epsilon each episode => Less exploration
 
     return Q
+
+
+
+def print_space(space: np.ndarray) -> None:
+    """
+    Print the game space in a readable format.
+
+    Args:
+        space (np.ndarray): Current state of the game space
+    """
+    symbol_map = {
+        EMPTY: '.',
+        PLAYER: 'P',
+        GOAL: 'G',
+        DRAGON: 'D'
+    }
+
+    height, width = space.shape
+    for y in range(height-1, -1, -1):
+        row_symbols = [symbol_map[space[y, x]] for x in range(width)]
+        print(' '.join(row_symbols))
+    print()  # Blank line after the space
+
+
 
 def test_policy(Q: np.ndarray, rewards: tuple[int, int, int, int]) -> tuple[list[tuple[int, int]], int, int]:
     """
@@ -332,8 +395,10 @@ def test_policy(Q: np.ndarray, rewards: tuple[int, int, int, int]) -> tuple[list
     total_reward = 0
     steps = 0
     path = [pos]
+    start_space = copy.deepcopy(space)
 
     while True:
+        print_space(space)
         state = state_to_index(pos)
         action = choose_action(pos, epsilon=0.0, Q=Q)  # Optimal policy
         new_pos, reward, done = apply_action(action, pos, space, rewards)
@@ -357,6 +422,8 @@ def test_policy(Q: np.ndarray, rewards: tuple[int, int, int, int]) -> tuple[list
             else:
                 print(f"Failure (dragon or out of bounds). Total reward: {total_reward}")
             break
+        space = update_space(space, start_space)
+
 
     return path, total_reward, steps
 

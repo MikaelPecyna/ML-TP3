@@ -1,6 +1,8 @@
 import pygame
+import time
+
 from view.utils import load_gif_frames
-from core.qlearning import test_qlearning
+from core.qlearning import Launcher
 from view.animatedSprite import AnimatedSprite
 
 TILE_SIZE = 64
@@ -34,8 +36,19 @@ class Engine:
             AnimatedSprite("sprites/perso/slime_violet.gif", (3, 2)),
         ]
 
+        self.flag = AnimatedSprite("sprites/flag/flag_purple.gif", (3,3))
+
+        self.launcher = Launcher(width , height)
+
+        self.move_index = 0
+        self.move_timer = 0
+        self.play_moves = False
+    
     def startQLearnin(self):
-        test_qlearning()
+        self.launcher.test_qlearning()
+        self.move_index = 0
+        self.move_timer = 0
+        self.play_moves = True   
     
     def draw_map(self):
         for y in range(self.height):
@@ -72,13 +85,26 @@ class Engine:
     def run(self):
         running = True
         clock = pygame.time.Clock()
+        move_delay = 5
     
         while running:
-            dt = clock.tick(60)  # temps depuis derniere frame
+            dt = clock.tick(240)  # temps depuis derniere frame
            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    self.startQLearnin()
+
+            # === LECTURE DU CHEMIN Q-LEARNING ===
+            if self.play_moves and self.move_index < len(self.launcher.all_moves):
+                self.move_timer += dt
+                if self.move_timer >= move_delay:
+                    old_pos, action, new_pos = self.launcher.all_moves[self.move_index]
+                    self.player.pos = new_pos 
+                    self.move_index += 1
+                    self.move_timer = 0
 
             # dessine le terrain
             self.draw_map()
@@ -92,10 +118,20 @@ class Engine:
                 enemy.update(dt)
                 enemy.draw(self.screen)
 
+            # dessine le drapeau
+            self.flag.update(dt)
+            self.flag.draw(self.screen)
+
             pygame.display.flip()
             clock.tick(60)
 
         pygame.quit()
 
+
+    def play_moves(self):
+        for (old_pos, action, new_pos) in self.launcher.all_moves:
+            # Met à jour la position du joueur dans la grille
+            self.player.grid_pos = new_pos  
+            time.sleep(0.5)  # Une action chaque 0.5 sec
 
 

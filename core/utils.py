@@ -35,10 +35,10 @@ def initialize_space(height: int = 4, width: int = 4) -> np.ndarray:
 
     # Place initial elements
     space[0][0] = PLAYER    # Player starting position
-    space[1][0] = DRAGON    # First dragon
-    space[1][2] = DRAGON    # Second dragon
-    space[2][3] = DRAGON    # Third dragon
-    space[3][1] = DRAGON    # Fourth dragon
+    space[0][1] = DRAGON    # First dragon
+    space[2][1] = DRAGON    # Second dragon
+    space[3][2] = DRAGON    # Third dragon
+    space[1][3] = DRAGON    # Fourth dragon
     space[3][3] = GOAL      # Goal position
 
     return space
@@ -289,7 +289,7 @@ def train_Q_learning(alpha: float, gamma: float, epsilon_start: float, episode: 
         np.ndarray: Trained Q-table
     """
 
-    space =initialize_space()
+    space = initialize_space()
 
     Q = initialize_Q_table(space)
 

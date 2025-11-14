@@ -11,8 +11,8 @@ import time
 
 def test_qlearning():
     # Paramètres
-    ALPHA = 0.9
-    GAMMA = 0.5
+    ALPHA = 0.2
+    GAMMA = 0.99
     EPSILON_START = .99
     EPOCHS = 10000
 
@@ -33,9 +33,9 @@ def test_qlearning():
 def test_qdeeplearning():
     # Paramètres
     ALPHA = 0.001
-    GAMMA = 0.5
+    GAMMA = 0.999
     EPSILON_START = .99
-    EPOCHS = 150
+    EPOCHS = 10
 
     space = initialize_space()
 
@@ -54,8 +54,8 @@ def test_qdeeplearning():
 #       MAIN
 # ======================
 if __name__ == "__main__":
-    test_qlearning()
-    # test_qdeeplearning()
+    # test_qlearning()
+    test_qdeeplearning()
 
     pass
     

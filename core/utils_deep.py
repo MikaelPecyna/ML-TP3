@@ -7,18 +7,29 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import MeanSquaredError
 from typing import Tuple
 import time
+import tensorflow as tf
+import random
+from tqdm import tqdm
+import keras
+import matplotlib.pyplot as plt
 
-def space_to_vec(space : np.ndarray) -> np.ndarray:
+def space_to_vec(position : tuple, N : int) -> np.ndarray:
     """
-    Convertit l'état du plateau de jeu en un vecteur d'entrée pour le modèle DNN.
-    
+    Convertit une position (y,x) en vecteur one-hot aplati de taille N.
+
     Args:
-        space (np.ndarray): État du plateau de jeu sous forme de matrice 4x4
-    
+        position (tuple): (y,x)
+        N (int): nombre total d'états (ex: 16 pour 4x4)
+
     Returns:
-        np.ndarray: Vecteur aplati de taille 16 représentant l'état du plateau
+        np.ndarray: vecteur de forme (1, N) one-hot
     """
-    return space.flatten()
+    vec_etat = np.zeros((1, N), dtype=float)
+    # largeur du plateau (supposons N carré, ex: 16 -> 4)
+    width = int(np.sqrt(N)) if N > 0 else 1
+    idx = int(position[0] * width + position[1])
+    vec_etat[0, idx] = 1.0
+    return vec_etat
 
 
 def build_dnn_model(input_shape: Tuple[int] = (16,)) -> Model:
@@ -56,11 +67,6 @@ def build_dnn_model(input_shape: Tuple[int] = (16,)) -> Model:
     model.summary()
     return model
 
-
-
-
-
-
 def choose_action(vec_state : np.ndarray, epsilon: float, model ) -> int:
     """
     Choose an action according to the epsilon-greedy strategy.
@@ -73,58 +79,20 @@ def choose_action(vec_state : np.ndarray, epsilon: float, model ) -> int:
         model : DNN that predict the best action
 
     Returns:
-        int: Index of the chosen action (0=Up, 1=Right, 2=Down, 3=Left)
-
     """
-    
-
     if not (0 <= epsilon <= 1):
         raise ValueError(f"epsilon must be in [0,1], got {epsilon}")
 
+    value = model.predict(vec_state, verbose=False)
 
     if random.uniform(0, 1) < epsilon:
-        return random.randint(0, 3)  
+        return (random.randint(0, 3), value) 
     else:
-        value = model.predict(np.array([vec_state]))[0]
-        return np.argmax(value)
-
-
-def update_Q_DQN(batch : list, model, alpha: float, gamma: float) -> None:
-    """
-    Met à jour les poids du modèle DQN en utilisant un batch d'expériences en utlisant tf.GradientTape.
-
-    Args:
-        batch (list): Liste de tuples (state, action, reward, next_state, done
-        model : DNN that predict the best action
-        alpha (float): Learning rate
-        gamma (float): Discount factor for future rewards
-    """
-    states = np.array([experience[0] for experience in batch])
-    actions = np.array([experience[1] for experience in batch])
-    rewards = np.array([experience[2] for experience in batch])
-    next_states = np.array([experience[3] for experience in batch])
-    dones = np.array([experience[4] for experience in batch])
-
-    with tf.GradientTape() as tape:
-        q_values = model(states)
-        q_values_next = model(next_states)
-
-        target_q_values = q_values.numpy()
-        for i in range(len(batch)):
-            if dones[i]:
-                target_q_values[i][actions[i]] = rewards[i]
-            else:
-                target_q_values[i][actions[i]] = rewards[i] + gamma * np.max(q_values_next[i].numpy())
-
-        loss = tf.reduce_mean(tf.square(target_q_values - q_values))
-
-    gradients = tape.gradient(loss, model.trainable_variables)
-    model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-    
+        return (np.argmax(value), value)
 
 
 
-def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episode: int, rewards: tuple[int, int, int, int] ) -> np.ndarray:
+def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episode: int, rewards: tuple[int, int, int, int] ) -> Model:
     """
     Train a Deep Q-Learning model using a DNN.
 
@@ -135,39 +103,70 @@ def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episo
         episode (int): Number of training episodes
         rewards (tuple[int, int, int, int]): Rewards for (goal, step, obstacle, out_of_bounds)
     Returns:
-        np.ndarray: Q-table learned by the model
+        Model : Trained DNN model
     """
-
     model = build_dnn_model()
 
-
-    
+    start_time = time.time()
     epsilon = epsilon_start
     epsilon_min = 0.1
     epsilon_decay = 0.995
 
-    for _ in tqdm(range(episode)):
+    suivi = np.zeros((episode))
+
+    pbar = tqdm(range(episode), desc="Training Episodes", unit="ep")
+    for i in pbar:
         pos = (0, 0)
         space = initialize_space()
+
+        N = space.shape[0]*space.shape[1]
         done = False
+        steps = 0
 
         while not done:
-            vec_state = space_to_vec(space)
-            action = choose_action(vec_state, epsilon, model)
+            vec_state = space_to_vec(pos, N)
 
-            new_pos, reward, done = apply_action(action, pos,  space, rewards)
+
+            action, _ = choose_action(vec_state, epsilon, model)
+
+
+            new_pos, reward, done = apply_action(action, pos, space, rewards)
             space[pos[0], pos[1]] = EMPTY
             space[new_pos[0], new_pos[1]] = PLAYER
+            vec_new_state = space_to_vec(new_pos, N)
+            target_q = reward + gamma * model.predict(vec_new_state, verbose=False).max()
+            target_q = tf.convert_to_tensor(target_q)  
 
-            vec_next_state = space_to_vec(space)
+            # Calcul différentiable à l'intérieur du tape
+            with tf.GradientTape() as tape:
+                q_values = model(vec_state)  
+                predicted_q = q_values[0, action]  
+                loss = keras.losses.mean_squared_error([target_q], [predicted_q])
 
-            batch = [(vec_state, action, reward, vec_next_state, done)]
-            update_Q_DQN(batch, model, alpha, gamma)
+            # Appliquer gradients
+            gradients = tape.gradient(loss, model.trainable_variables)
+            model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+            suivi[i] += loss.numpy()
+            # print(loss)
 
             pos = new_pos
+            steps += 1
 
-
+        pbar.set_postfix({
+            'Episode': i+1,
+            'Epsilon': f"{epsilon:.3f}",
+            'Avg Loss': f"{np.mean(suivi[:i+1]):.4f}",
+            'Steps/Ep': steps,
+            'Time': f"{time.time() - start_time:.1f}s"
+        })
         epsilon = max(epsilon_min, epsilon * epsilon_decay)  
+
+    plt.plot(suivi)
+    plt.xlabel('Episode')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Episodes')
+    plt.savefig('training_loss.png')
+    # plt.show()
 
     return model
 
@@ -183,13 +182,13 @@ def test_policy_DQN(model, rewards: tuple[int, int, int, int]) -> None:
     steps = 0
     pos = (0, 0)
     space = initialize_space()
+    N = space.shape[0] * space.shape[1]
     done = False
     total_reward = 0
 
     while not done:
-        vec_state = space_to_vec(space)
-        action = choose_action(vec_state, 0.0, model)  # Exploitation only
-        
+        vec_state = space_to_vec(pos, N)
+        action, _ = choose_action(vec_state, 0.0, model)  # Exploitation only
 
         new_pos, reward, done = apply_action(action, pos, space, rewards)
         space[pos[0], pos[1]] = EMPTY
@@ -197,16 +196,14 @@ def test_policy_DQN(model, rewards: tuple[int, int, int, int]) -> None:
 
         total_reward += reward
         pos = new_pos
+        steps += 1
 
         print(f"\nStep {steps}: Action {['Up', 'Right', 'Down', 'Left'][action]}")
         print(f"Position: {pos}")
-        time.sleep(0.5)
+        # time.sleep(0.5)
 
         if done:
-            if reward > 0:
-                print(f"Victory! Total reward: {total_reward} in {steps} steps.")
-            else:
-                print(f"Failure (dragon or out of bounds). Total reward: {total_reward}")
-            break
+            print(f"Victory! Total reward: {total_reward} in {steps} steps.")
 
     print("Total reward during test:", total_reward)
+

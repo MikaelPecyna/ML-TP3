@@ -1,8 +1,6 @@
 import pygame
-import time
-
-from view.utils import load_gif_frames
-from core.qlearning import Launcher
+import core.qlearning as LauncherQL
+import core.deepLearning as LauncherDL
 from view.animatedSprite import AnimatedSprite
 
 TILE_SIZE = 64
@@ -12,7 +10,7 @@ class Engine:
         pygame.init()
         self.width = width
         self.height = height
-
+        
         self.top_margin = 40  # espace pour le texte
         self.right_margin = 200  # espace pour le texte
         self.screen = pygame.display.set_mode((width * TILE_SIZE + self.right_margin, height * TILE_SIZE + self.top_margin))
@@ -42,26 +40,24 @@ class Engine:
 
         self.flag = AnimatedSprite("sprites/flag/flag_purple.gif", (width - 1, height - 1))
 
-        self.launcher = Launcher(width , height)
+        self.launcherQL = LauncherQL.LauncherQL(width , height)
+        self.launcherDL = LauncherDL.LauncherDL(width , height)
+        self.launcher = self.launcherDL #default
 
         self.move_index = 0
         self.move_timer = 0
         self.play_moves = False
         self.move_delay = 5  
-        
+
+        self.play_test = False
+        self.test_path = []
+        self.test_total_reward = 0
+        self.test_steps = 0
+     
         self.font = pygame.font.Font(None, 20)
         self.score = 0
         self.current_epoch = 0
-    
-    def startQLearnin(self):
-        self.launcher.all_moves.clear()
-        self.launcher.epoch_scores.clear()
-        self.launcher.epoch_steps.clear()
-        self.move_index = 0
-        self.move_timer = 0
-        self.play_moves = True
-        self.launcher.test_qlearning()  
-    
+     
     def draw_map(self):
         for y in range(self.height):
             for x in range(self.width):
@@ -96,6 +92,7 @@ class Engine:
 
 
     def draw_text(self):
+        messages = []
         if self.play_moves:
             # reset
             pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, self.width * TILE_SIZE + self.right_margin, self.top_margin))
@@ -106,18 +103,21 @@ class Engine:
 
             self.screen.blit(score_text, (10, 5))
             self.screen.blit(speed_text, (100, 5))
-            self.screen.blit(epoch_text, (200, 5))
-     
+            self.screen.blit(epoch_text, (200, 5)) 
         else:
             if not self.launcher.all_moves: 
-                msg = "Press SPACE to start Q-Learning"
+                messages.append("Press SPACE to start Q-Learning")
             else:
-                msg = "Q-Learning Finished"
-
-            text = self.font.render(msg, True, (255, 255, 255))
-            text_rect = text.get_rect(center=(self.width * TILE_SIZE // 2, self.height * TILE_SIZE // 2))
-            self.screen.blit(text, text_rect)
-
+                messages.append("Q-Learning Finished - Press SPACE to Replay")
+                messages.append("Press DOWN ARROW to test")
+            
+            for i, msg in enumerate(messages):
+                text = self.font.render(msg, True, (255, 255, 255))
+                text_rect = text.get_rect(
+                    center=(self.width * TILE_SIZE // 2,
+                            self.height * TILE_SIZE // 2 + i * 25) 
+                )
+                self.screen.blit(text, text_rect)
 
     def run(self):
         running = True
@@ -131,22 +131,36 @@ class Engine:
                     running = False
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    self.startQLearnin()
-                
+                    self.launcher.all_moves.clear()
+                    self.launcher.epoch_scores.clear()
+                    self.launcher.epoch_steps.clear()
+                    self.move_index = 0
+                    self.move_timer = 0
+                    self.play_moves = True
+                    self.launcher.launch_training()
+                                    
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
                     self.move_index = max(0, len(self.launcher.all_moves) - 1)
 
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
-                    #faire plus tard test du jeu
+                    self.launcher.launch_test()
+                    self.test_path = self.launcher.test_path
+                    self.test_total_reward = self.launcher.test_total_reward
+                    self.test_steps = self.launcher.test_steps
+
+                    self.move_index = 0
+                    self.move_timer = 0
+                    self.play_test = True
+                    self.play_moves = False
                     pass
 
                 # Control speed with arrow keys
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RIGHT:
-                        self.move_delay = max(1, self.move_delay - 1)  # Augmente vitesse (diminue délai)
+                        self.move_delay = max(1, self.move_delay - 10)  # Augmente vitesse (diminue délai)
                     elif event.key == pygame.K_LEFT:
-                        self.move_delay += 1  # Diminue vitesse (augmente délai)
+                        self.move_delay += 10  # Diminue vitesse (augmente délai)
 
             # === LECTURE DU CHEMIN Q-LEARNING ===
             if self.play_moves and self.move_index < len(self.launcher.all_moves):
@@ -169,6 +183,14 @@ class Engine:
                             break
                         move_count += len(ep_scores)
 
+            if self.play_test and self.move_index < len(self.test_path):
+                self.move_timer += dt
+                if self.move_timer >= self.move_delay:
+                    new_pos = self.test_path[self.move_index]
+                    self.player.pos = new_pos
+                    self.move_index += 1
+                    self.move_timer = 0
+
             # dessine le terrain
             self.draw_map()
 
@@ -190,6 +212,9 @@ class Engine:
 
             if self.play_moves and self.move_index >= len(self.launcher.all_moves):
                 self.play_moves = False  
+            
+            if self.play_test and self.move_index >= len(self.test_path):
+                self.play_test = False  
 
             pygame.display.flip()
             clock.tick(60)

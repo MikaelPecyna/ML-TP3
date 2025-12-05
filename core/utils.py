@@ -314,50 +314,6 @@ def train_Q_learning(alpha: float, gamma: float, epsilon_start: float, episode: 
 
     return Q
 
-def test_policy(Q: np.ndarray, rewards: tuple[int, int, int, int]) -> tuple[list[tuple[int, int]], int, int]:
-    """
-    Test the learned policy by running an episode.
 
-    Args:
-        Q (np.ndarray): Trained Q-table
-        rewards (tuple[int, int, int, int]): Reward structure
-
-    Returns:
-        tuple[list[tuple[int, int]], int, int]: Path taken, total reward, number of steps
-    """
-    import time
-
-    pos = (0, 0)
-    space = initialize_space()
-    total_reward = 0
-    steps = 0
-    path = [pos]
-
-    while True:
-        state = state_to_index(pos)
-        action = choose_action(pos, epsilon=0.0, Q=Q)  # Optimal policy
-        new_pos, reward, done = apply_action(action, pos, space, rewards)
-
-        # Update space
-        space[pos[0], pos[1]] = EMPTY
-        space[new_pos[0], new_pos[1]] = PLAYER
-
-        total_reward += reward
-        steps += 1
-        path.append(new_pos)
-        pos = new_pos
-
-        print(f"\nStep {steps}: Action {['Up', 'Right', 'Down', 'Left'][action]}")
-        print(f"Position: {pos}")
-        # time.sleep(0.5)
-
-        if done:
-            if reward > 0:
-                print(f"Victory! Total reward: {total_reward} in {steps} steps.")
-            else:
-                print(f"Failure (dragon or out of bounds). Total reward: {total_reward}")
-            break
-
-    return path, total_reward, steps
 
 

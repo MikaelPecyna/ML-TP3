@@ -1,17 +1,12 @@
-from utils import *
+from core.utils import EMPTY, PLAYER, apply_action, initialize_space
 import numpy as np
-import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, Input, Activation
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import MeanSquaredError
 from typing import Tuple
-import time
-import tensorflow as tf
 import random
-from tqdm import tqdm
-import keras
-import matplotlib.pyplot as plt
+
 
 def space_to_vec(position : tuple, N : int) -> np.ndarray:
     """
@@ -89,87 +84,6 @@ def choose_action(vec_state : np.ndarray, epsilon: float, model ) -> int:
         return (random.randint(0, 3), value) 
     else:
         return (np.argmax(value), value)
-
-
-
-def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episode: int, rewards: tuple[int, int, int, int] ) -> Model:
-    """
-    Train a Deep Q-Learning model using a DNN.
-
-    Args:
-        alpha (float): Learning rate
-        gamma (float): Discount factor for future rewards
-        epsilon_start (float): Initial exploration probability
-        episode (int): Number of training episodes
-        rewards (tuple[int, int, int, int]): Rewards for (goal, step, obstacle, out_of_bounds)
-    Returns:
-        Model : Trained DNN model
-    """
-    model = build_dnn_model()
-
-    start_time = time.time()
-    epsilon = epsilon_start
-    epsilon_min = 0.1
-    epsilon_decay = 0.995
-
-    suivi = np.zeros((episode))
-
-    pbar = tqdm(range(episode), desc="Training Episodes", unit="ep")
-    for i in pbar:
-        pos = (0, 0)
-        space = initialize_space()
-
-        N = space.shape[0]*space.shape[1]
-        done = False
-        steps = 0
-
-        while not done:
-            vec_state = space_to_vec(pos, N)
-
-
-            action, _ = choose_action(vec_state, epsilon, model)
-
-
-            new_pos, reward, done = apply_action(action, pos, space, rewards)
-            space[pos[0], pos[1]] = EMPTY
-            space[new_pos[0], new_pos[1]] = PLAYER
-            vec_new_state = space_to_vec(new_pos, N)
-            target_q = reward + gamma * model.predict(vec_new_state, verbose=False).max()
-            target_q = tf.convert_to_tensor(target_q)  
-
-            # Calcul différentiable à l'intérieur du tape
-            with tf.GradientTape() as tape:
-                q_values = model(vec_state)  
-                predicted_q = q_values[0, action]  
-                loss = keras.losses.mean_squared_error([target_q], [predicted_q])
-
-            # Appliquer gradients
-            gradients = tape.gradient(loss, model.trainable_variables)
-            model.optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-            suivi[i] += loss.numpy()
-            # print(loss)
-
-            pos = new_pos
-            steps += 1
-
-        pbar.set_postfix({
-            'Episode': i+1,
-            'Epsilon': f"{epsilon:.3f}",
-            'Avg Loss': f"{np.mean(suivi[:i+1]):.4f}",
-            'Steps/Ep': steps,
-            'Time': f"{time.time() - start_time:.1f}s"
-        })
-        epsilon = max(epsilon_min, epsilon * epsilon_decay)  
-
-    plt.plot(suivi)
-    plt.xlabel('Episode')
-    plt.ylabel('Loss')
-    plt.title('Training Loss over Episodes')
-    plt.savefig('training_loss.png')
-    # plt.show()
-
-    return model
-
 
 def test_policy_DQN(model, rewards: tuple[int, int, int, int]) -> None:
     """

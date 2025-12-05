@@ -101,7 +101,7 @@ class Engine:
             pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, self.width * TILE_SIZE + self.right_margin, self.top_margin))
         
             score_text = self.font.render(f"Score: {self.score} | ", True, (255, 255, 255))
-            speed_text = self.font.render(f"Speed: {self.move_delay}ms |", True, (255, 255, 255))
+            speed_text = self.font.render(f"Delay: {self.move_delay}ms |", True, (255, 255, 255))
             epoch_text = self.font.render(f"Epoch: {self.current_epoch}/{self.launcher.max_epoch}", True, (255, 255, 255))
 
             self.screen.blit(score_text, (10, 5))

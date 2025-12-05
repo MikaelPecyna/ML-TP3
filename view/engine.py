@@ -12,7 +12,11 @@ class Engine:
         pygame.init()
         self.width = width
         self.height = height
-        self.screen = pygame.display.set_mode((width * TILE_SIZE, height * TILE_SIZE))
+
+        self.top_margin = 40  # espace pour le texte
+        self.right_margin = 200  # espace pour le texte
+        self.screen = pygame.display.set_mode((width * TILE_SIZE + self.right_margin, height * TILE_SIZE + self.top_margin))
+
         pygame.display.set_caption("Tile Terrain Engine")
 
         self.sprites = {
@@ -36,19 +40,27 @@ class Engine:
             AnimatedSprite("sprites/perso/slime_violet.gif", (3, 2)),
         ]
 
-        self.flag = AnimatedSprite("sprites/flag/flag_purple.gif", (3,3))
+        self.flag = AnimatedSprite("sprites/flag/flag_purple.gif", (width - 1, height - 1))
 
         self.launcher = Launcher(width , height)
 
         self.move_index = 0
         self.move_timer = 0
         self.play_moves = False
+        self.move_delay = 5  
+        
+        self.font = pygame.font.Font(None, 20)
+        self.score = 0
+        self.current_epoch = 0
     
     def startQLearnin(self):
-        self.launcher.test_qlearning()
+        self.launcher.all_moves.clear()
+        self.launcher.epoch_scores.clear()
+        self.launcher.epoch_steps.clear()
         self.move_index = 0
         self.move_timer = 0
-        self.play_moves = True   
+        self.play_moves = True
+        self.launcher.test_qlearning()  
     
     def draw_map(self):
         for y in range(self.height):
@@ -80,12 +92,36 @@ class Engine:
                 else:
                     sprite = self.sprites["center"]
 
-                self.screen.blit(sprite, (x * TILE_SIZE, y * TILE_SIZE))
+                self.screen.blit(sprite, (x * TILE_SIZE, y * TILE_SIZE + self.top_margin))
+
+
+    def draw_text(self):
+        if self.play_moves:
+            # reset
+            pygame.draw.rect(self.screen, (0, 0, 0), (0, 0, self.width * TILE_SIZE + self.right_margin, self.top_margin))
+        
+            score_text = self.font.render(f"Score: {self.score} | ", True, (255, 255, 255))
+            speed_text = self.font.render(f"Speed: {self.move_delay}ms |", True, (255, 255, 255))
+            epoch_text = self.font.render(f"Epoch: {self.current_epoch}/{self.launcher.max_epoch}", True, (255, 255, 255))
+
+            self.screen.blit(score_text, (10, 5))
+            self.screen.blit(speed_text, (100, 5))
+            self.screen.blit(epoch_text, (200, 5))
+     
+        else:
+            if not self.launcher.all_moves: 
+                msg = "Press SPACE to start Q-Learning"
+            else:
+                msg = "Q-Learning Finished"
+
+            text = self.font.render(msg, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(self.width * TILE_SIZE // 2, self.height * TILE_SIZE // 2))
+            self.screen.blit(text, text_rect)
+
 
     def run(self):
         running = True
         clock = pygame.time.Clock()
-        move_delay = 5
     
         while running:
             dt = clock.tick(240)  # temps depuis derniere frame
@@ -96,31 +132,64 @@ class Engine:
 
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
                     self.startQLearnin()
+                
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_UP:
+                    self.move_index = max(0, len(self.launcher.all_moves) - 1)
+
+
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_DOWN:
+                    #faire plus tard test du jeu
+                    pass
+
+                # Control speed with arrow keys
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RIGHT:
+                        self.move_delay = max(1, self.move_delay - 1)  # Augmente vitesse (diminue délai)
+                    elif event.key == pygame.K_LEFT:
+                        self.move_delay += 1  # Diminue vitesse (augmente délai)
 
             # === LECTURE DU CHEMIN Q-LEARNING ===
             if self.play_moves and self.move_index < len(self.launcher.all_moves):
                 self.move_timer += dt
-                if self.move_timer >= move_delay:
+                if self.move_timer >= self.move_delay:
                     old_pos, action, new_pos = self.launcher.all_moves[self.move_index]
                     self.player.pos = new_pos 
                     self.move_index += 1
                     self.move_timer = 0
+
+                    # #mise à jour du score et de l'époque
+                    move_count = 0
+                    for i, ep_scores in enumerate(self.launcher.epoch_scores):
+                        if self.move_index <= move_count + len(ep_scores):
+                            # move_index appartient à cet épisode
+                            self.current_epoch = i + 1
+
+                            # Score cumulé jusqu'à ce move
+                            self.score = sum(ep_scores[:self.move_index - move_count])
+                            break
+                        move_count += len(ep_scores)
 
             # dessine le terrain
             self.draw_map()
 
             # dessine le player
             self.player.update(dt)
-            self.player.draw(self.screen)
+            self.player.draw(self.screen, self.top_margin)
 
             # dessine les enemis
             for enemy in self.enemies:
                 enemy.update(dt)
-                enemy.draw(self.screen)
+                enemy.draw(self.screen, self.top_margin)
 
             # dessine le drapeau
             self.flag.update(dt)
-            self.flag.draw(self.screen)
+            self.flag.draw(self.screen, self.top_margin)
+
+            # dessine le texte (epoch et score)
+            self.draw_text()
+
+            if self.play_moves and self.move_index >= len(self.launcher.all_moves):
+                self.play_moves = False  
 
             pygame.display.flip()
             clock.tick(60)
@@ -128,10 +197,5 @@ class Engine:
         pygame.quit()
 
 
-    def play_moves(self):
-        for (old_pos, action, new_pos) in self.launcher.all_moves:
-            # Met à jour la position du joueur dans la grille
-            self.player.grid_pos = new_pos  
-            time.sleep(0.5)  # Une action chaque 0.5 sec
 
 

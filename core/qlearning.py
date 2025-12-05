@@ -14,23 +14,29 @@ PLAYER  = 1  # Player position
 GOAL    = 2  # Goal cell
 DRAGON  = 3  # Dragon position
 
-
 class Launcher:
     def __init__(self, width, height):
         self.all_moves = []
-        
+        self.max_epoch = 1000
+
+        self.current_scores = {}   
+       
+        self.epoch_scores = []  
+        self.epoch_steps  = []  
+
+
+
     def test_qlearning(self):
         # Paramètres
         ALPHA = 0.9
         GAMMA = 0.5
         EPSILON_START = .99
-        EPOCHS = 10000
-
+     
         #space = initialize_space()
 
         #=== TEST 1 : R = 30, -10, -1, -2 ===
-        R1 = (2, -2, -1, 0)  # (goal, dragon, out_of_bounds, empty)
-        Q1 = self.train_Q_learning(ALPHA, GAMMA, EPSILON_START, EPOCHS, R1)
+        R1 = (40, -20, -2, -1)  # (goal, dragon, out_of_bounds, empty)
+        Q1 = self.train_Q_learning(ALPHA, GAMMA, EPSILON_START, self.max_epoch, R1)
 
         print("Q-table shape:", Q1.shape)
         print("Q1 : \n", Q1)
@@ -53,57 +59,65 @@ class Launcher:
         Returns:
             np.ndarray: Trained Q-table
         """
-
         space = initialize_space()
-
         Q = initialize_Q_table(space)
 
         epsilon = epsilon_start
         epsilon_min = 0.1
         epsilon_decay = 0.995
 
-        for _ in tqdm(range(episode)):
+        for epoch in tqdm(range(episode)):
             pos = (0, 0)
             space = initialize_space()
             done = False
+            self.current_scores = []
+            #epsilon =  1.0 - (epoch / episode) 
 
             while not done:
                 state = state_to_index(pos)
                 action = choose_action(pos, epsilon, Q)
                 new_pos, reward, done = apply_action(action, pos, space, rewards)
 
-                
                 # ← ENREGISTREMENT DU MOVE :
                 self.all_moves.append((pos, action, new_pos))
 
+                # ACCUMULATION DU SCORE
+                self.current_scores.append(reward)
+
                 next_state = state_to_index(new_pos)
                 update_Q_table(Q, state, next_state, action, alpha, reward, gamma, done)
+                
                 pos = new_pos
+         
+            # ENREGISTREMENT DES STATS DE L'ÉPISODE
+            self.epoch_steps.append(epoch)
+            self.epoch_scores.append(self.current_scores)
 
+            # DECROISSANCE D'EPSILON
             epsilon = max(epsilon_min, epsilon * epsilon_decay)  # Reduce epsilon each episode => Less exploration
 
         return Q
 
 
 
-def test_qdeeplearning():
-    # Paramètres
-    ALPHA = 0.001
-    GAMMA = 0.5
-    EPSILON_START = .99
-    EPOCHS = 150
+# def test_qdeeplearning():
+#     # Paramètres
+#     ALPHA = 0.001
+#     GAMMA = 0.5
+#     EPSILON_START = .99
+#     EPOCHS = 150
 
-    space = initialize_space()
+#     space = initialize_space()
 
-    #=== TEST 1 : R = 30, -10, -1, -2 ===
-    R1 = (100, -20, -3, -1)  # (goal, dragon, out_of_bounds, empty)
-    model = train_Q_learning_DQN(ALPHA, GAMMA, EPSILON_START, EPOCHS, R1)
+#     #=== TEST 1 : R = 30, -10, -1, -2 ===
+#     R1 = (100, -20, -3, -1)  # (goal, dragon, out_of_bounds, empty)
+#     model = train_Q_learning_DQN(ALPHA, GAMMA, EPSILON_START, self.max_epoch, R1)
 
-    print("DNN model trained!")
-    print(model.summary())
+#     print("DNN model trained!")
+#     print(model.summary())
 
-    #Test the learned policy
-    test_policy_DQN(model, R1)  # Version console
+#     #Test the learned policy
+#     test_policy_DQN(model, R1)  # Version console
 
 
 

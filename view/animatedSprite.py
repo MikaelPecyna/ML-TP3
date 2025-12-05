@@ -14,8 +14,7 @@ class AnimatedSprite:
             self.index = (self.index + 1) % len(self.frames)
             self.time = 0
 
-    def draw(self, screen):
-        frame = self.frames[self.index]
-        screen.blit(frame, (self.pos[0] * TILE_SIZE, self.pos[1] * TILE_SIZE))
+    def draw(self, screen, offset_y=0):
+        screen.blit(self.frames[self.index], (self.pos[0] * TILE_SIZE, self.pos[1] * TILE_SIZE + offset_y))
 
 

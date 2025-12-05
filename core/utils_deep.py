@@ -8,8 +8,6 @@ from tensorflow.keras.losses import MeanSquaredError
 from typing import Tuple
 import time
 
-
-
 def space_to_vec(space : np.ndarray) -> np.ndarray:
     """
     Convertit l'état du plateau de jeu en un vecteur d'entrée pour le modèle DNN.

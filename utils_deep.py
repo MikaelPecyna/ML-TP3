@@ -103,7 +103,7 @@ def choose_action(vec_state : np.ndarray, epsilon: float, model ) -> int:
 
 
 
-def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episode: int, rewards: tuple[int, int, int, int] ) -> np.ndarray:
+def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episode: int, rewards: tuple[int, int, int, int] ) -> Model:
     """
     Train a Deep Q-Learning model using a DNN.
 
@@ -114,29 +114,31 @@ def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episo
         episode (int): Number of training episodes
         rewards (tuple[int, int, int, int]): Rewards for (goal, step, obstacle, out_of_bounds)
     Returns:
-        np.ndarray: Q-table learned by the model
+        Model : Trained DNN model
     """
 
     model = build_dnn_model()
 
 
-    
+    start_time = time.time()
     epsilon = epsilon_start
     epsilon_min = 0.1
-    epsilon_decay = 0.8
+    epsilon_decay = 0.995
 
-    
+
 
     suivi = np.zeros((episode))
 
-    
 
-    for i in tqdm(range(episode)):
+
+    pbar = tqdm(range(episode), desc="Training Episodes", unit="ep")
+    for i in pbar:
         pos = (0, 0)
         space = initialize_space()
 
         N = space.shape[0]*space.shape[1]
         done = False
+        steps = 0
 
         while not done:
             vec_state = space_to_vec(pos, N)
@@ -165,6 +167,15 @@ def train_Q_learning_DQN(alpha: float, gamma: float, epsilon_start: float, episo
             # print(loss)
 
             pos = new_pos
+            steps += 1
+
+        pbar.set_postfix({
+            'Episode': i+1,
+            'Epsilon': f"{epsilon:.3f}",
+            'Avg Loss': f"{np.mean(suivi[:i+1]):.4f}",
+            'Steps/Ep': steps,
+            'Time': f"{time.time() - start_time:.1f}s"
+        })
 
 
 
@@ -215,9 +226,9 @@ def test_policy_DQN(model, rewards: tuple[int, int, int, int]) -> None:
         # time.sleep(0.5)
 
         if done:
-
             print(f"Victory! Total reward: {total_reward} in {steps} steps.")
 
 
 
     print("Total reward during test:", total_reward)
+

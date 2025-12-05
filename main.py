@@ -34,8 +34,8 @@ def test_qdeeplearning():
     # Paramètres
     ALPHA = 0.001
     GAMMA = 0.999
-    EPSILON_START = .99
-    EPOCHS = 10
+    EPSILON_START = .999
+    EPOCHS = 1000
 
     space = initialize_space()
 

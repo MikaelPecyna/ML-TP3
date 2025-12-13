@@ -1,6 +1,7 @@
 import pygame
 import core.qlearning as LauncherQL
 import core.deepLearning as LauncherDL
+import core.doubleqdeeplearning as LauncherDDQN
 from view.animatedSprite import AnimatedSprite
 
 TILE_SIZE = 64
@@ -42,6 +43,7 @@ class Engine:
 
         self.launcherQL = LauncherQL.LauncherQL(width , height)
         self.launcherDL = LauncherDL.LauncherDL(width , height)
+        self.launcherDDQN = LauncherDDQN.LauncherDDQN(width , height)
         self.launcher = self.launcherDL #default
 
         self.move_index = 0
@@ -105,10 +107,11 @@ class Engine:
             self.screen.blit(speed_text, (100, 5))
             self.screen.blit(epoch_text, (200, 5)) 
         else:
-            if not self.launcher.all_moves: 
-                messages.append("Press SPACE to start Q-Learning")
+            if not self.launcher.all_moves:
+                messages.append("Press SPACE to start training")
+                messages.append(f"Mode: {type(self.launcher).__name__}")
             else:
-                messages.append("Q-Learning Finished - Press SPACE to Replay")
+                messages.append("Training Finished - Press SPACE to Replay")
                 messages.append("Press DOWN ARROW to test")
             
             for i, msg in enumerate(messages):
